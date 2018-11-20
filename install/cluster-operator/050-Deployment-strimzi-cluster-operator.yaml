@@ -31,6 +31,7 @@ spec:
           value: strimzi/kafka:latest-kafka-2.0.0
         - name: STRIMZI_KAFKA_IMAGE_MAP
           value: |
+            2.0.1=strimzi/kafka:latest-kafka-2.0.0-kafka-2.0.1
             2.0.0=strimzi/kafka:latest-kafka-2.0.0-kafka-2.0.0
             1.1.1=strimzi/kafka:latest-kafka-2.0.0-kafka-1.1.1
             1.0.2=strimzi/kafka:latest-kafka-2.0.0-kafka-1.0.2

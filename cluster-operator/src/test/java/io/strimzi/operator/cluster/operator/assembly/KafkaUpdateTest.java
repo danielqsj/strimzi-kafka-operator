@@ -12,7 +12,6 @@ import io.fabric8.kubernetes.api.model.extensions.StatefulSetBuilder;
 import io.strimzi.api.kafka.model.Kafka;
 import io.strimzi.api.kafka.model.KafkaBuilder;
 import io.strimzi.operator.cluster.KafkaUpgradeException;
-import io.strimzi.operator.cluster.model.KafkaCluster;
 import io.strimzi.operator.cluster.model.KafkaConfiguration;
 import io.strimzi.operator.cluster.model.ModelUtils;
 import io.strimzi.operator.cluster.operator.resource.KafkaSetOperator;
@@ -48,7 +47,6 @@ import static io.strimzi.test.TestUtils.map;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -102,15 +100,16 @@ public class KafkaUpdateTest {
         }
     }
 
+
     private List<StatefulSet> upgrade(TestContext context, Map<String, String> versionMap,
                                       Kafka initialKafka, StatefulSet initialSs, Kafka updatedKafka,
                                       Consumer<Integer> reconcileExceptions, Consumer<Integer> rollExceptions) {
         KafkaSetOperator kso = mock(KafkaSetOperator.class);
 
-        when(kso.waitForQuiescence(NAMESPACE, KafkaCluster.kafkaClusterName(NAME)))
-                .thenAnswer(invocation -> Future.succeededFuture(initialSs != null ?
-                        initialSs :
-                        KafkaCluster.fromCrd(initialKafka).generateStatefulSet(false)));
+//        when(kso.waitForQuiescence(NAMESPACE, KafkaCluster.kafkaClusterName(NAME)))
+//                .thenAnswer(invocation -> Future.succeededFuture(initialSs != null ?
+//                        initialSs :
+//                        KafkaCluster.fromCrd(initialKafka).generateStatefulSet(false)));
 
         List<StatefulSet> states = new ArrayList<>(2);
         when(kso.reconcile(anyString(), anyString(), any(StatefulSet.class))).thenAnswer(invocation -> {
@@ -121,7 +120,7 @@ public class KafkaUpdateTest {
         });
 
         AtomicInteger rollingUpdates = new AtomicInteger();
-        when(kso.maybeRollingUpdate(any(), anyBoolean())).thenAnswer(invocation -> {
+        when(kso.maybeRollingUpdate(any(), any())).thenAnswer(invocation -> {
             context.assertTrue(invocation.getArgument(1));
             rollExceptions.accept(rollingUpdates.getAndIncrement());
             return Future.succeededFuture();

@@ -1,7 +1,7 @@
 FROM centos:7
 
-ARG KAFKA_SHA512=b28e81705e30528f1abb6766e22dfe9dae50b1e1e93330c880928ff7a08e6b38ee71cbfc96ec14369b2dfd24293938702cab422173c8e01955a9d1746ae43f98
-ARG KAFKA_VERSION=2.0.0
+ARG KAFKA_SHA512
+ARG KAFKA_VERSION
 
 RUN yum -y install java-1.8.0-openjdk-headless gettext nmap-ncat openssl && yum clean all -y
 

@@ -41,6 +41,7 @@ spec:
               value: "{{ default .Values.kafka.image.repository .Values.imageRepositoryOverride }}/{{ .Values.kafka.image.name }}:{{ default .Values.kafka.image.tag .Values.imageTagOverride }}"
             - name: STRIMZI_KAFKA_IMAGE_MAP
               value: |
+                2.0.1={{ default .Values.kafka.image.repository .Values.imageRepositoryOverride }}/{{ .Values.kafka.image.name }}:{{ default .Values.kafka.image.tag .Values.imageTagOverride }}-kafka-2.0.1
                 2.0.0={{ default .Values.kafka.image.repository .Values.imageRepositoryOverride }}/{{ .Values.kafka.image.name }}:{{ default .Values.kafka.image.tag .Values.imageTagOverride }}-kafka-2.0.0
                 1.1.1={{ default .Values.kafka.image.repository .Values.imageRepositoryOverride }}/{{ .Values.kafka.image.name }}:{{ default .Values.kafka.image.tag .Values.imageTagOverride }}-kafka-1.1.1
                 1.0.2={{ default .Values.kafka.image.repository .Values.imageRepositoryOverride }}/{{ .Values.kafka.image.name }}:{{ default .Values.kafka.image.tag .Values.imageTagOverride }}-kafka-1.0.2

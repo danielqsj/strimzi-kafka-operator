@@ -10,11 +10,13 @@ import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.OwnerReferenceBuilder;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.extensions.Deployment;
 import io.fabric8.kubernetes.api.model.extensions.StatefulSet;
 import io.fabric8.kubernetes.api.model.extensions.StatefulSetBuilder;
+import io.fabric8.kubernetes.api.model.extensions.StatefulSetStatus;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.openshift.api.model.Route;
@@ -64,11 +66,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
-import static io.strimzi.operator.common.operator.resource.AbstractScalableResourceOperator.STRIMZI_OPERATOR_DOMAIN;
 import static io.strimzi.operator.cluster.model.KafkaCluster.ANNO_STRIMZI_IO_FROM_VERSION;
 import static io.strimzi.operator.cluster.model.KafkaCluster.ANNO_STRIMZI_IO_KAFKA_VERSION;
 import static io.strimzi.operator.cluster.model.KafkaCluster.ANNO_STRIMZI_IO_TO_VERSION;
@@ -76,6 +79,7 @@ import static io.strimzi.operator.cluster.model.KafkaCluster.ENV_VAR_KAFKA_CONFI
 import static io.strimzi.operator.cluster.model.KafkaConfiguration.INTERBROKER_PROTOCOL_VERSION;
 import static io.strimzi.operator.cluster.model.KafkaConfiguration.LOG_MESSAGE_FORMAT_VERSION;
 import static io.strimzi.operator.cluster.model.KafkaVersion.compareDottedVersions;
+import static io.strimzi.operator.common.operator.resource.AbstractScalableResourceOperator.STRIMZI_OPERATOR_DOMAIN;
 
 /**
  * <p>Assembly operator for a "Kafka" assembly, which manages:</p>
@@ -369,10 +373,34 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             return Future.succeededFuture(this);
         }
 
+        /**
+         * If the SS exists, wait until it has finished any updates.
+         * Then check that all the pods are up to date wrt the SS.
+         *
+         * @return A Future which completes with the current state of the SS, or with null if the SS never existed.
+         */
+        public Future<StatefulSet> waitForQuiescence(String namespace, String statefulSetName) {
+            AtomicReference<StatefulSet> ssRef = new AtomicReference<>();
+            return kafkaSetOperations.waitFor(namespace, statefulSetName, 1000, operationTimeoutMs, (ignore1, ignore2) -> {
+                StatefulSet statefulSet = kafkaSetOperations.get(namespace, statefulSetName);
+                ssRef.set(statefulSet);
+                if (statefulSet == null) {
+                    return true;
+                }
+                // TODO this also needs to check for and complete any rolling updates
+                StatefulSetStatus status = statefulSet.getStatus();
+                return status != null && Objects.equals(status.getCurrentRevision(), status.getUpdateRevision());
+            }).compose(ignored -> {
+                StatefulSet ss = ssRef.get();
+                return ss != null ? kafkaSetOperations.maybeRollingUpdate(ss,
+                    pod -> !isPodUpToDate(ss, pod)) : Future.succeededFuture();
+            }).map(v -> ssRef.get());
+        }
+
         Future<ReconciliationState> kafkaUpgrade() {
             // Wait until the SS is not being updated (it shouldn't be, but there's no harm in checking)
             String kafkaSsName = KafkaCluster.kafkaClusterName(name);
-            return kafkaSetOperations.waitForQuiescence(namespace, kafkaSsName).compose(
+            return waitForQuiescence(namespace, kafkaSsName).compose(
                 ss -> {
                     if (ss == null) {
                         return Future.succeededFuture(this);
@@ -509,7 +537,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             String name = KafkaCluster.kafkaClusterName(this.name);
             log.info("{}: Upgrade: Patch + rolling update of {}", reconciliation, name);
             return kafkaSetOperations.reconcile(namespace, name, newSs)
-                    .compose(result -> kafkaSetOperations.maybeRollingUpdate(ss, true).map(result.resource()))
+                    .compose(result -> kafkaSetOperations.maybeRollingUpdate(ss, pod -> {
+                        log.info("{}: Upgrade: Patch + rolling update of {}: Pod {}", reconciliation, name, pod.getMetadata().getName());
+                        return true;
+                    }).map(result.resource()))
                     .compose(ss2 -> {
                         log.info("{}: {}, phase 1 of {} completed: {}", reconciliation, upgrade,
                                 twoPhase ? 2 : 1,
@@ -571,7 +602,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             // Reconcile the SS and perform a rolling update of the pods
             log.info("{}: Upgrade: Patch + rolling update of {}", reconciliation, name);
             return kafkaSetOperations.reconcile(namespace, KafkaCluster.kafkaClusterName(name), newSs)
-                    .compose(ignored -> kafkaSetOperations.maybeRollingUpdate(ss, true))
+                    .compose(ignored -> kafkaSetOperations.maybeRollingUpdate(ss, pod -> {
+                        log.info("{}: Upgrade: Patch + rolling update of {}: Pod {}", reconciliation, name, pod.getMetadata().getName());
+                        return true;
+                    }))
                     .compose(ignored -> {
                         log.info("{}: {}, phase 2 of 2 completed", reconciliation, upgrade);
                         return Future.succeededFuture();
@@ -651,7 +685,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             String name = KafkaCluster.kafkaClusterName(this.name);
             log.info("{}: Downgrade: Patch + rolling update of {}", reconciliation, name);
             return kafkaSetOperations.reconcile(namespace, name, newSs)
-                    .compose(result -> kafkaSetOperations.maybeRollingUpdate(ss, true).map(result.resource()))
+                    .compose(result -> kafkaSetOperations.maybeRollingUpdate(ss, pod -> {
+                        log.info("{}: Downgrade: Patch + rolling update of {}: Pod {}", reconciliation, name, pod.getMetadata().getName());
+                        return true;
+                    }).map(result.resource()))
                     .compose(ss2 -> {
                         log.info("{}: {}, phase 1 of {} completed", reconciliation, upgrade, phases);
                         return Future.succeededFuture(ss2);
@@ -710,7 +747,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             // Reconcile the SS and perform a rolling update of the pods
             log.info("{}: Upgrade: Patch + rolling update of {}", reconciliation, name);
             return kafkaSetOperations.reconcile(namespace, KafkaCluster.kafkaClusterName(name), newSs)
-                    .compose(ignored -> kafkaSetOperations.maybeRollingUpdate(ss, true))
+                    .compose(ignored -> kafkaSetOperations.maybeRollingUpdate(ss, pod -> {
+                        log.info("{}: Upgrade: Patch + rolling update of {}: Pod {}", reconciliation, name, pod.getMetadata().getName());
+                        return true;
+                    }))
                     .compose(ignored -> {
                         log.info("{}: {}, phase 2 of 2 completed", reconciliation, downgrade);
                         return Future.succeededFuture();
