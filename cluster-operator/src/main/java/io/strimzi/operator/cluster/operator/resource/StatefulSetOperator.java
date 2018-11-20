@@ -121,25 +121,33 @@ public abstract class StatefulSetOperator extends AbstractScalableResourceOperat
         Future<Void> f = Future.succeededFuture();
 
         if (ss.getMetadata().getLabels().get(Labels.STRIMZI_NAME_LABEL).endsWith("zookeeper")) { //todo do we need to check everytime or just when scaleup?
-            Future<Integer> leader = zookeeperLeader(namespace, name, replicas);
+            boolean zkRoll = false;
+            for (int o = 0; o < replicas; o++) {
+                Pod pod = podOperations.get(ss.getMetadata().getNamespace(), name + "-" + o);
+                zkRoll = zkRoll | podRestart.test(pod);
+            }
 
-            f = leader.compose(lead -> { // we have a leader, so we can roll up all other zk pods
-                log.debug("Zookeeper leader is pod: " + lead);
-                List<Future> nonLeaders = new ArrayList<>();
-                for (int i = 0; i < replicas; i++) {
-                    String podName = name + "-" + i;
-                    if (i != lead) {
-                        log.debug("maybe restarting non leader pod " + i);
-                        // old followers can be restarted at the same time
-                        nonLeaders.add(maybeRestartPod(ss, podName, podRestart));
+            if (zkRoll) {
+                Future<Integer> leader = zookeeperLeader(namespace, name, replicas);
+
+                f = leader.compose(lead -> { // we have a leader, so we can roll up all other zk pods
+                    log.debug("Zookeeper leader is pod: " + lead);
+                    List<Future> nonLeaders = new ArrayList<>();
+                    for (int i = 0; i < replicas; i++) {
+                        String podName = name + "-" + i;
+                        if (i != lead) {
+                            log.debug("maybe restarting non leader pod " + i);
+                            // old followers can be restarted at the same time
+                            nonLeaders.add(maybeRestartPod(ss, podName, podRestart));
+                        }
                     }
-                }
-                return CompositeFuture.join(nonLeaders).compose(ar -> {
-                    // the leader is restarted as the last
-                    log.debug("maybe restarting leader pod " + lead);
-                    return maybeRestartPod(ss, name + "-" + lead, podRestart);
+                    return CompositeFuture.join(nonLeaders).compose(ar -> {
+                        // the leader is restarted as the last
+                        log.debug("maybe restarting leader pod " + lead);
+                        return maybeRestartPod(ss, name + "-" + lead, podRestart);
+                    });
                 });
-            });
+            }
         } else {
             // For each non-zk replica, maybe restart it
             for (int i = 0; i < replicas; i++) {
