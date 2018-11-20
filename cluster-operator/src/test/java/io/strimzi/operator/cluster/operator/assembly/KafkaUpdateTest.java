@@ -12,6 +12,7 @@ import io.fabric8.kubernetes.api.model.extensions.StatefulSetBuilder;
 import io.strimzi.api.kafka.model.Kafka;
 import io.strimzi.api.kafka.model.KafkaBuilder;
 import io.strimzi.operator.cluster.KafkaUpgradeException;
+import io.strimzi.operator.cluster.model.KafkaCluster;
 import io.strimzi.operator.cluster.model.KafkaConfiguration;
 import io.strimzi.operator.cluster.model.ModelUtils;
 import io.strimzi.operator.cluster.operator.resource.KafkaSetOperator;
@@ -106,10 +107,7 @@ public class KafkaUpdateTest {
                                       Consumer<Integer> reconcileExceptions, Consumer<Integer> rollExceptions) {
         KafkaSetOperator kso = mock(KafkaSetOperator.class);
 
-//        when(kso.waitForQuiescence(NAMESPACE, KafkaCluster.kafkaClusterName(NAME)))
-//                .thenAnswer(invocation -> Future.succeededFuture(initialSs != null ?
-//                        initialSs :
-//                        KafkaCluster.fromCrd(initialKafka).generateStatefulSet(false)));
+        StatefulSet kafkaSs = initialSs != null ? initialSs : KafkaCluster.fromCrd(initialKafka).generateStatefulSet(false);
 
         List<StatefulSet> states = new ArrayList<>(2);
         when(kso.reconcile(anyString(), anyString(), any(StatefulSet.class))).thenAnswer(invocation -> {
@@ -121,7 +119,7 @@ public class KafkaUpdateTest {
 
         AtomicInteger rollingUpdates = new AtomicInteger();
         when(kso.maybeRollingUpdate(any(), any())).thenAnswer(invocation -> {
-            context.assertTrue(invocation.getArgument(1));
+            //context.assertTrue(invocation.getArgument(1));
             rollExceptions.accept(rollingUpdates.getAndIncrement());
             return Future.succeededFuture();
         });
@@ -136,7 +134,12 @@ public class KafkaUpdateTest {
 
         Async async = context.async();
         Future<KafkaAssemblyOperator.ReconciliationState> future = op
-                .new ReconciliationState(reconciliation, updatedKafka)
+                .new ReconciliationState(reconciliation, updatedKafka) {
+                    @Override
+                    public Future<StatefulSet> waitForQuiescence(String namespace, String statefulSetName) {
+                        return Future.succeededFuture(kafkaSs);
+                    }
+                }
                 .kafkaUpgrade();
         AtomicReference<UpgradeException> ex = new AtomicReference<>();
         future.setHandler(ar -> {

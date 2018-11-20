@@ -139,7 +139,7 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             log.error("{} spec cannot be null", kafkaAssembly.getMetadata().getName());
             return Future.failedFuture("Spec cannot be null");
         }
-        new ReconciliationState(reconciliation, kafkaAssembly)
+        createReconciliationState(reconciliation, kafkaAssembly)
                 .reconcileCas()
 
                 .compose(state -> state.zkManualPodCleaning())
@@ -202,6 +202,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                 .compose(state -> chainFuture.complete(), chainFuture);
 
         return chainFuture;
+    }
+
+    ReconciliationState createReconciliationState(Reconciliation reconciliation, Kafka kafkaAssembly) {
+        return new ReconciliationState(reconciliation, kafkaAssembly);
     }
 
     /**

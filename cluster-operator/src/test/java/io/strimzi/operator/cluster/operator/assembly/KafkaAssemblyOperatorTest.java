@@ -378,7 +378,17 @@ public class KafkaAssemblyOperatorTest {
                 ClusterOperatorConfig.DEFAULT_OPERATION_TIMEOUT_MS,
                 certManager,
                 supplier,
-                emptyMap());
+                emptyMap()) {
+            @Override
+            public ReconciliationState createReconciliationState(Reconciliation r, Kafka ka) {
+                return new ReconciliationState(r, ka) {
+                    @Override
+                    public Future<StatefulSet> waitForQuiescence(String namespace, String statefulSetName) {
+                        return Future.succeededFuture(null);
+                    }
+                };
+            }
+        };
 
         // Now try to create a KafkaCluster based on this CM
         Async async = context.async();
@@ -753,11 +763,23 @@ public class KafkaAssemblyOperatorTest {
                 ClusterOperatorConfig.DEFAULT_OPERATION_TIMEOUT_MS,
                 certManager,
                 supplier,
-                emptyMap());
+                emptyMap()) {
+            @Override
+            public ReconciliationState createReconciliationState(Reconciliation r, Kafka ka) {
+                return new ReconciliationState(r, ka) {
+                    @Override
+                    public Future<StatefulSet> waitForQuiescence(String namespace, String statefulSetName) {
+                        return Future.succeededFuture(originalKafkaCluster.generateStatefulSet(openShift));
+                    }
+                };
+            }
+        };
 
         // Now try to update a KafkaCluster based on this CM
         Async async = context.async();
-        ops.createOrUpdate(new Reconciliation("test-trigger", ResourceType.KAFKA, clusterNamespace, clusterName), updatedAssembly).setHandler(createResult -> {
+        ops.createOrUpdate(new Reconciliation("test-trigger", ResourceType.KAFKA, clusterNamespace, clusterName) {
+
+        }, updatedAssembly).setHandler(createResult -> {
             if (createResult.failed()) createResult.cause().printStackTrace();
             context.assertTrue(createResult.succeeded());
 
