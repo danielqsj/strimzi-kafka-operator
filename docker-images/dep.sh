@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
-#set -x
-strimzi_version=$RELEASE_VERSION
+
+if [ -n "$RELEASE_VERSION" ]; then
+    strimzi_version="$RELEASE_VERSION"
+else
+    strimzi_version="latest"
+fi
+
 java_images="java-base"
 # Note dependency order of the following images
 stunnel_images="stunnel-base zookeeper-stunnel kafka-stunnel entity-operator-stunnel"
@@ -15,23 +20,29 @@ checksums["2.0.0"]=b28e81705e30528f1abb6766e22dfe9dae50b1e1e93330c880928ff7a08e6
 checksums["2.0.1"]=9773A85EF2898B4BAE20481DF4CFD5488BD195FFFD700FCC874A9FA55065F6873F2EE12F46D2F6A6CCB5D5A93DDB7DEC19227AEF5D39D4F72B545EC63B24BB2F
 
 function build {
-    targets=$@
+    targets="$@"
+    build_args="$DOCKER_BUILD_ARGS"
     # Images not depending on Kafka version
     for image in $(echo "$java_images $stunnel_images"); do
-        BUILD_TAG="latest" \
-        DOCKER_TAG="$strimzi_version" \
-        make -C "$image" "$targets"
+        #export BUILD_TAG="latest"
+        #export DOCKER_TAG="${strimzi_version}"
+        DOCKER_TAG="${strimzi_version}" BUILD_TAG="latest-${kafka_version}" make -C "$image" "$targets"
     done
-    # Images depending on Kafka version (possibly indirectly thru FROM)
-    for kafka_version in ${!checksums[@]}; do
-        sha=${checksums[$version]}
-        for image in $(echo "$kafka_images"); do
-            DOCKER_BUILD_ARGS="--build-arg KAFKA_VERSION=${kafka_version} --build-arg KAFKA_SHA512=${sha} ${DOCKER_BUILD_ARGS}" \
-            BUILD_TAG="latest" \
-            DOCKER_TAG="$strimzi_version-kafka-$kafka_version" \
-            makeit make -C "$image" "$targets"
+    if [ "$targets" != "docker_build" ]; then
+        # Images depending on Kafka version (possibly indirectly thru FROM)
+        for kafka_version in ${!checksums[@]}; do
+            sha=${checksums[$kafka_version]}
+            for image in $(echo "$kafka_images"); do
+
+                export DOCKER_BUILD_ARGS="--build-arg KAFKA_VERSION=${kafka_version} --build-arg KAFKA_SHA512=${sha} ${build_args}"
+                if [ "$targets" == "docker_tag" ]; then
+                    DOCKER_TAG="${strimzi_version}-kafka-${kafka_version}" make -C "$image" "docker_build"
+                fi
+                DOCKER_TAG="${strimzi_version}-kafka-${kafka_version}" make -C "$image" "$targets"
+            done
         done
-    done
+    fi
 }
 
 build $@
+

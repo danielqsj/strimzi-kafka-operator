@@ -66,7 +66,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import static io.strimzi.operator.cluster.model.ModelUtils.DEFAULT_KAFKA_VERSION;
 import static io.strimzi.operator.cluster.model.ModelUtils.parseImageMap;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonMap;
@@ -260,7 +259,7 @@ public class KafkaCluster extends AbstractModel {
         result.setReplicas(kafkaClusterSpec.getReplicas());
         String version = kafkaClusterSpec.getVersion();
         if (version == null) {
-            version = DEFAULT_KAFKA_VERSION;
+            version = KafkaVersion.defaultVersion().version();
         }
         String image = kafkaClusterSpec.getImage();
         if (image == null) {

@@ -9,21 +9,18 @@ TOPDIR=$(dir $(lastword $(MAKEFILE_LIST)))
 DOCKERFILE_DIR     ?= ./
 DOCKER_REGISTRY    ?= docker.io
 DOCKER_ORG         ?= $(USER)
-# DOCKER_TAG: The tag the image is published with; the target image when running docker_tag
 DOCKER_TAG         ?= latest
-# BUILD_TAG: The tag the image is built with; the source image when running docker_tag
-BUILD_TAG          ?= latest
 RELEASE_VERSION    ?= $(shell cat $(TOPDIR)/release.version)
 
 all: docker_build docker_push
 
 docker_build:
-	# Build Docker image tagging with $(BUILD_TAG)...
-	docker build -q $(DOCKER_BUILD_ARGS) --build-arg strimzi_version=$(RELEASE_VERSION) -t strimzi/$(PROJECT_NAME):$(BUILD_TAG) $(DOCKERFILE_DIR)
+	# Build Docker image tagging with latest...
+	docker build -q $(DOCKER_BUILD_ARGS) --build-arg strimzi_version=$(RELEASE_VERSION) -t strimzi/$(PROJECT_NAME):latest $(DOCKERFILE_DIR)
 
-docker_tag:
-	# Tag the image we built (with the $(BUILD_TAG) tag) with the $(DOCKER_TAG)
-	docker tag strimzi/$(PROJECT_NAME):$(BUILD_TAG) $(DOCKER_REGISTRY)/$(DOCKER_ORG)/$(PROJECT_NAME):$(DOCKER_TAG)
+docker_tag: docker_build
+	# Tag the image we built (with the latest tag) with the $(DOCKER_TAG) tag
+	docker tag strimzi/$(PROJECT_NAME):latest $(DOCKER_REGISTRY)/$(DOCKER_ORG)/$(PROJECT_NAME):$(DOCKER_TAG)
 
 docker_push: docker_tag
 	# Push the image tagged with $(DOCKER_TAG) to the registry $(DOCKER_REGISTRY)

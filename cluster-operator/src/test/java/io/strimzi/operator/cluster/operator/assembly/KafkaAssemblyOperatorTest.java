@@ -312,7 +312,6 @@ public class KafkaAssemblyOperatorTest {
         when(mockZsOps.scaleDown(anyString(), anyString(), anyInt())).thenReturn(Future.succeededFuture(null));
         when(mockZsOps.maybeRollingUpdate(any(), any(Predicate.class))).thenReturn(Future.succeededFuture());
         when(mockZsOps.scaleUp(anyString(), anyString(), anyInt())).thenReturn(Future.succeededFuture(42));
-//        when(mockKsOps.waitForQuiescence(anyString(), anyString())).thenReturn(Future.succeededFuture(null));
         when(mockKsOps.reconcile(anyString(), anyString(), ssCaptor.capture())).thenReturn(Future.succeededFuture(ReconcileResult.created(null)));
         when(mockKsOps.scaleDown(anyString(), anyString(), anyInt())).thenReturn(Future.succeededFuture(null));
         when(mockKsOps.maybeRollingUpdate(any(), any(Predicate.class))).thenReturn(Future.succeededFuture());
@@ -683,9 +682,6 @@ public class KafkaAssemblyOperatorTest {
         when(mockKsOps.get(clusterNamespace, KafkaCluster.kafkaClusterName(clusterName))).thenReturn(
                 originalKafkaCluster.generateStatefulSet(openShift)
         );
-//        when(mockKsOps.waitForQuiescence(clusterNamespace, KafkaCluster.kafkaClusterName(clusterName))).thenReturn(
-//                Future.succeededFuture(originalKafkaCluster.generateStatefulSet(openShift))
-//        );
         when(mockZsOps.get(clusterNamespace, ZookeeperCluster.zookeeperClusterName(clusterName))).thenReturn(
                 originalZookeeperCluster.generateStatefulSet(openShift)
         );

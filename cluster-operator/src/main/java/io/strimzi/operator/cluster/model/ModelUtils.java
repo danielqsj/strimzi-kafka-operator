@@ -18,8 +18,6 @@ import java.util.StringTokenizer;
 public class ModelUtils {
     private ModelUtils() {}
 
-    public static final String DEFAULT_KAFKA_VERSION = "2.0.0";
-
     /**
      * Find the first secret in the given secrets with the given name
      */

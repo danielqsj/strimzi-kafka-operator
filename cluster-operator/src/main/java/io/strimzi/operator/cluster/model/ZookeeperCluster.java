@@ -44,7 +44,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.strimzi.operator.cluster.model.ModelUtils.DEFAULT_KAFKA_VERSION;
 import static io.strimzi.operator.cluster.model.ModelUtils.parseImageMap;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
@@ -161,7 +160,7 @@ public class ZookeeperCluster extends AbstractModel {
             replicas = ZookeeperClusterSpec.DEFAULT_REPLICAS;
         }
         zk.setReplicas(replicas);
-        String version = DEFAULT_KAFKA_VERSION;
+        String version = KafkaVersion.defaultVersion().version();
         String image = zookeeperClusterSpec.getImage();
         if (image == null) {
             image = IMAGE_MAP.get(version);

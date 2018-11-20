@@ -21,6 +21,10 @@ public class KafkaVersion implements Comparable<KafkaVersion> {
     private static final KafkaVersion V2_0_0 = new KafkaVersion("2.0.0", "2.0", "2.0");
     private static final KafkaVersion DEFAULT_VERSION = V2_0_0;
 
+    public static KafkaVersion defaultVersion() {
+        return DEFAULT_VERSION;
+    }
+
     /** Find the version from the given version string */
     public static KafkaVersion version(String version) {
         KafkaVersion result;
